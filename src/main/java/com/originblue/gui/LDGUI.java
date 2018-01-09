@@ -355,7 +355,7 @@ public class LDGUI {
 
         this.strategyRunning = new AtomicBoolean(false);
         this.metaProvider = metaProvider;
-        this.frmNodaxTradingUi.setTitle("NoDax Trading UI");
+        this.frmNodaxTradingUi.setTitle("LoDax Trading UI");
         maxHistory = new AtomicInteger(3000);
         changing = new Semaphore(1);
         datasets = new HashMap<String, LDDataset>();
@@ -462,7 +462,7 @@ public class LDGUI {
     private void initialize() {
         this.frmNodaxTradingUi = new JFrame();
         this.frmNodaxTradingUi.setAlwaysOnTop(true);
-        this.frmNodaxTradingUi.setTitle("NoDax Trading UI");
+        this.frmNodaxTradingUi.setTitle("LoDax Trading UI");
         this.frmNodaxTradingUi.setBounds(100, 100, 643, 688);
         this.frmNodaxTradingUi.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 

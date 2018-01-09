@@ -21,7 +21,7 @@ public class LDConfigurationUI extends JDialog {
 	private JTextField txtPassphrase;
 	private JButton btnOk;
 	private final LDConfigurationUI dialog;
-	private static final String CONFPATH = System.getProperty("user.home") + File.separatorChar + "nodax.properties";
+	private static final String CONFPATH = System.getProperty("user.home") + File.separatorChar + "lodax.properties";
 
 	// Will block until modal is disposed of
 	public Properties prompt() {
