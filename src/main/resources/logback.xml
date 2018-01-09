@@ -1,0 +1,22 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <timestamp key="fileTimestamp" datePattern="yyyy-MM-dd'_'HH-mm-ss.SSS"/>
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${user.home}${file.separator}lodax-log-${fileTimestamp}.txt</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger level="DEBUG" name="com.originblue.lodax.fix"/>
+    <logger level="DEBUG" name="com.originblue.lodax.gui.NDFIXFrontend"/>
+    <root level="INFO" additivity="true">
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>
