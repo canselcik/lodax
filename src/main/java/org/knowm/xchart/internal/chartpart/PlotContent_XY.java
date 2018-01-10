@@ -89,6 +89,7 @@ public class PlotContent_XY<ST extends AxesChartStyler, S extends XYSeries> exte
             double previousX = -Double.MAX_VALUE;
             double previousY = -Double.MAX_VALUE;
 
+            XYSeriesRenderStyle renderStyle = series.getXYSeriesRenderStyle();
             double[] errorBars = series.getExtraValues();
             Path2D.Double path = null;
 
@@ -105,7 +106,7 @@ public class PlotContent_XY<ST extends AxesChartStyler, S extends XYSeries> exte
                 if (next == Double.NaN) {
 
                     // for area charts
-                    closePath(g, path, previousX, getBounds(), yTopMargin);
+                    closePath(g, path, previousX, getBounds(), yTopMargin, renderStyle == XYSeriesRenderStyle.ReverseArea);
                     path = null;
 
                     previousX = -Double.MAX_VALUE;
@@ -177,19 +178,24 @@ public class PlotContent_XY<ST extends AxesChartStyler, S extends XYSeries> exte
                 }
 
                 // paint area
-                if (XYSeriesRenderStyle.Area == series.getXYSeriesRenderStyle()
-                        || XYSeriesRenderStyle.StepArea == series.getXYSeriesRenderStyle()) {
+                if (renderStyle == XYSeriesRenderStyle.Area ||
+                        renderStyle == XYSeriesRenderStyle.ReverseArea ||
+                        renderStyle == XYSeriesRenderStyle.StepArea) {
 
                     if (previousX != -Double.MAX_VALUE && previousY != -Double.MAX_VALUE) {
 
-                        double yBottomOfArea = getBounds().getY() + getBounds().getHeight() - yTopMargin;
+                        double yBottomOfArea = getBounds().getY();
+                        if (renderStyle != XYSeriesRenderStyle.ReverseArea) {
+                            yBottomOfArea += getBounds().getHeight() - yTopMargin;
+                        }
 
                         if (path == null) {
                             path = new Path2D.Double();
                             path.moveTo(previousX, yBottomOfArea);
                             path.lineTo(previousX, previousY);
                         }
-                        if (XYSeriesRenderStyle.Area == series.getXYSeriesRenderStyle()) {
+                        if (renderStyle == XYSeriesRenderStyle.Area ||
+                                renderStyle == XYSeriesRenderStyle.ReverseArea) {
                             path.lineTo(xOffset, yOffset);
                         } else {
                             if (previousX != xOffset) {
@@ -199,6 +205,7 @@ public class PlotContent_XY<ST extends AxesChartStyler, S extends XYSeries> exte
                                 path.lineTo(xOffset, yOffset);
                             }
                         }
+
                     }
                     if (xOffset < previousX) {
                         throw new RuntimeException("X-Data must be in ascending order for Area Charts!!!");
@@ -267,7 +274,7 @@ public class PlotContent_XY<ST extends AxesChartStyler, S extends XYSeries> exte
 
             // close any open path for area charts
             g.setColor(series.getFillColor());
-            closePath(g, path, previousX, getBounds(), yTopMargin);
+            closePath(g, path, previousX, getBounds(), yTopMargin, renderStyle == XYSeriesRenderStyle.ReverseArea);
         }
     }
 }
