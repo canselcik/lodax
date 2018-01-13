@@ -132,14 +132,12 @@ public class LDGUI {
                 } else if (e.getKeyCode() == KeyEvent.VK_DELETE) {
                     final int histSize = maxHistory.get();
                     maxHistory.set(1);
-                    new Thread(new Runnable() {
-                        public void run() {
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException e1) {
-                            }
-                            maxHistory.set(histSize);
+                    new Thread(() -> {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e1) {
                         }
+                        maxHistory.set(histSize);
                     }).start();
                 }
             }
@@ -154,7 +152,7 @@ public class LDGUI {
         frmNodaxTradingUi.setVisible(true);
 
         KeyEventDispatcher keyEventDispatcher = e -> {
-            if (e.getID() != KeyEvent.KEY_RELEASED)
+            if (e.getID() != KeyEvent.KEY_PRESSED)
                 return false;
             BigDecimal amount = new BigDecimal(txtBTCAmount.getText());
             switch (e.getKeyCode()) {
@@ -218,51 +216,49 @@ public class LDGUI {
 
     // Light it up strategy... Lights up the orderbook
     public void lightItUpStrategy(final LDConstants.OrderSide side, final BigDecimal amount) {
-        new Thread(new Runnable() {
-            public void run() {
-                while(true) {
-                    Queue<LDFIXOrder> orders = new LinkedList<LDFIXOrder>();
-                    strategyRunning.set(true);
-                    for (int i = 0; i < 500; i++) {
-                        if (!strategyRunning.get())
-                            break;
-                        // int offset = ThreadLocalRandom.current().nextInt(0, 11);
-                        int offset = 1 + (i % 30);
-                        LDFIXOrder order = new LDFIXOrder(side);
-                        BigDecimal bbp = orderbook.getBestBid().getPrice();
-                        BigDecimal bap = orderbook.getBestAsk().getPrice();
+        new Thread(() -> {
+            while(true) {
+                Queue<LDFIXOrder> orders = new LinkedList<LDFIXOrder>();
+                strategyRunning.set(true);
+                for (int i = 0; i < 500; i++) {
+                    if (!strategyRunning.get())
+                        break;
+                    int offset = ThreadLocalRandom.current().nextInt(0, 11);
+//                    int offset = 1 + (i % 30);
+                    LDFIXOrder order = new LDFIXOrder(side);
+                    BigDecimal bbp = orderbook.getBestBid().getPrice();
+                    BigDecimal bap = orderbook.getBestAsk().getPrice();
 
-                        BigDecimal price;
-                        if (side == LDConstants.OrderSide.SELL) {
-                            price = bap.add(MIN_PRICEDIFF.multiply(BigDecimal.valueOf(offset)));
-                        } else {
-                            price = bbp.subtract(MIN_PRICEDIFF.multiply(BigDecimal.valueOf(offset)));
-                        }
-                        order.setPrice(price);
-                        order.setSize(amount);
-                        fixSession.submitFIXOrder(order, TRADINGPAIR);
-                        try {
-                            Thread.sleep(35);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        if (!orders.isEmpty()) {
-                            fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR, false, true);
-                        }
-                        orders.add(order);
-                        try {
-                            Thread.sleep(35);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                    BigDecimal price;
+                    if (side == LDConstants.OrderSide.SELL) {
+                        price = bap.add(MIN_PRICEDIFF.multiply(BigDecimal.valueOf(offset)));
+                    } else {
+                        price = bbp.subtract(MIN_PRICEDIFF.multiply(BigDecimal.valueOf(offset)));
                     }
-                    while (!orders.isEmpty()) {
-                        fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR, true, true);
-                        try {
-                            Thread.sleep(65);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+                    order.setPrice(price);
+                    order.setSize(amount);
+                    fixSession.submitFIXOrder(order, TRADINGPAIR);
+                    try {
+                        Thread.sleep(35);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    if (!orders.isEmpty() && i > 10) {
+                        fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR, false, true);
+                    }
+                    orders.add(order);
+                    try {
+                        Thread.sleep(35);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                while (!orders.isEmpty()) {
+                    fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR, true, true);
+                    try {
+                        Thread.sleep(65);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
             }
@@ -273,29 +269,27 @@ public class LDGUI {
 
     // TODO: Wallseeker strategy -- seek for large walls that would support the desired position and place order above/below it
     public void rapidFireStrategy(final LDConstants.OrderSide side, final BigDecimal amount) {
-        new Thread(new Runnable() {
-            public void run() {
-                Queue<LDFIXOrder> orders = new LinkedList<LDFIXOrder>();
-                for (int i = 0; i < 500; i++) {
-                    LDFIXOrder order = defaultStrategyRunner(side, amount, false);
-                    try {
-                        Thread.sleep(77);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    if(!orders.isEmpty()) {
-                        fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR, false, true);
-                    }
-                    orders.add(order);
-                    try {
-                        Thread.sleep(70);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+        new Thread(() -> {
+            Queue<LDFIXOrder> orders = new LinkedList<LDFIXOrder>();
+            for (int i = 0; i < 500; i++) {
+                LDFIXOrder order = defaultStrategyRunner(side, amount, false);
+                try {
+                    Thread.sleep(77);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-                while (!orders.isEmpty()) {
-                    fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR,false, true);
+                if(!orders.isEmpty()) {
+                    fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR, false, true);
                 }
+                orders.add(order);
+                try {
+                    Thread.sleep(70);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            while (!orders.isEmpty()) {
+                fixSession.cancelFIXOrder(orders.remove(), TRADINGPAIR,false, true);
             }
         }).start();
 
@@ -311,14 +305,12 @@ public class LDGUI {
     }
 
     private void defaultStrategy(final LDConstants.OrderSide side, final BigDecimal amount) {
-        new Thread(new Runnable() {
-            public void run() {
-                LDFIXOrder order = defaultStrategyRunner(side, amount, true);
+        new Thread(() -> {
+            LDFIXOrder order = defaultStrategyRunner(side, amount, true);
 
-                // TODO: Invoke later on GUI thread
-                orderStack.push(order);
-                tableModel.insertRow(0, new Object[]{order.getSide(), order.getSize(), order.getPrice()});
-            }
+            // TODO: Invoke later on GUI thread
+            orderStack.push(order);
+            tableModel.insertRow(0, new Object[]{order.getSide(), order.getSize(), order.getPrice()});
         }).start();
     }
 
@@ -343,13 +335,7 @@ public class LDGUI {
         initialize();
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (UnsupportedLookAndFeelException e) {
+        } catch (ClassNotFoundException | InstantiationException | UnsupportedLookAndFeelException | IllegalAccessException e) {
             e.printStackTrace();
         }
 
@@ -449,8 +435,8 @@ public class LDGUI {
         this.lblLastTrade.setText("");
     }
 
-    public void setWsStatus(long ms) {
-        this.lblWs.setText(ms < 0 ? "N/A" : (String.valueOf(ms) + " ms"));
+    public void setWsStatus(BigDecimal ms) {
+        this.lblWs.setText(ms.compareTo(BigDecimal.ZERO) <= 0 ? "N/A" : (String.valueOf(ms) + " ms"));
     }
 
     public void setFixStatus(boolean connected) {
@@ -528,18 +514,16 @@ public class LDGUI {
         this.lblWs.setFont(new Font("Tahoma", Font.PLAIN, 17));
         this.lblWs.setBounds(121, 26, 75, 14);
         this.panel_1.add(this.lblWs);
-        
+
         this.btnLogout = new JButton("Logout");
-        this.btnLogout.addActionListener(new ActionListener() {
-        	public void actionPerformed(ActionEvent e) {
-        	    if (fixSession != null) {
-                    try {
-                        fixSession.sendLogout();
-                    } catch (IOException e1) {
-                        e1.printStackTrace();
-                    }
+        this.btnLogout.addActionListener(e -> {
+            if (fixSession != null) {
+                try {
+                    fixSession.sendLogout();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
                 }
-        	}
+            }
         });
         btnLogout.setBounds(10, 77, 171, 23);
         this.panel_1.add(btnLogout);

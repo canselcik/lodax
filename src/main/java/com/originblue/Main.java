@@ -69,7 +69,6 @@ public class Main {
         graph.createDataset("lastPrice", XYSeries.XYSeriesRenderStyle.Line);
         graph.display();
 
-        // Display the trading UI if we have the GDAX_* env vars set
         if (fixSession != null) {
             graph.setFixStatus(true);
         }
@@ -105,15 +104,15 @@ public class Main {
                 else
                     graph.setBtcBalance(btcAcc.balance, btcAcc.hold);
 
-                graph.setFixStatus(fixSession != null && fixSession.connected());
                 graph.setWsStatus(orderbook.millisSinceLastMessage());
                 graph.setBestBid(bb);
                 graph.setBestAsk(ba);
                 graph.setLastTradePrice(lp);
+                graph.setFixStatus(fixSession != null && fixSession.connected());
             }
         }
 
-        graph.setWsStatus(-1);
+        graph.setWsStatus(BigDecimal.ZERO);
         if (fixSession != null) {
             fixSession.sendLogout();
             fixSession.waitComplete();

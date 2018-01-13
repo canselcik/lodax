@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.originblue.abstractds.LDMovingAverage;
 import com.originblue.abstractds.LDRBTree;
 import com.originblue.abstractds.LDTreap;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
@@ -64,8 +65,10 @@ public class LDOrderbook {
     private AtomicReference<BigDecimal> lastBestBid, lastBestAsk, lastTradeSize, lastTradePrice;
     private AtomicReference<String> lastTradeSide;
 
-    public Long millisSinceLastMessage() {
-        return System.currentTimeMillis() - lastWsMessageMillis.get();
+    private static LDMovingAverage avgLatency = new LDMovingAverage(1024);
+    public BigDecimal millisSinceLastMessage() {
+        avgLatency.add(BigDecimal.valueOf(System.currentTimeMillis() - lastWsMessageMillis.get()));
+        return avgLatency.getAverage();
     }
 
     public BigInteger getLastSequenceNumber() {

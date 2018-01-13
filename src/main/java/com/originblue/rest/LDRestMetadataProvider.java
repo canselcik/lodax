@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class LDRestMetadataProvider {
@@ -20,27 +21,32 @@ public class LDRestMetadataProvider {
     private String secret, key, passphrase;
     private static final JsonParser parser = new JsonParser();
     private static final String GDAX_API = "https://api.gdax.com";
+    private AtomicBoolean running;
 
     public LDRestMetadataProvider(String secret, String key, String passphrase) {
         this.secret = secret;
+        this.running = new AtomicBoolean(false);
         this.key = key;
         this.passphrase = passphrase;
         this.accounts = new HashMap<String, NDAccount>();
     }
 
     public void init(final int checkIntervalMillis) {
-        new Thread(new Runnable() {
-            public void run() {
-                while (true) {
-                    updateAccounts();
-                    try {
-                        Thread.sleep(checkIntervalMillis);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+        running.set(true);
+        new Thread(() -> {
+            while (running.get()) {
+                updateAccounts();
+                try {
+                    Thread.sleep(checkIntervalMillis);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
         }).start();
+    }
+
+    public void stop() {
+        running.set(false);
     }
 
     public class NDAccount {
@@ -90,7 +96,7 @@ public class LDRestMetadataProvider {
         return out.toString();
     }
 
-    public boolean updateAccounts() {
+    private boolean updateAccounts() {
         try {
             String body = getURL(GDAX_API + "/accounts");
             JsonArray array = parser.parse(body).getAsJsonArray();

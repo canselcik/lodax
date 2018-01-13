@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.paritytrading.philadelphia.fix42.FIX42MsgTypes.*;
 import static com.paritytrading.philadelphia.fix42.FIX42Tags.*;
@@ -29,9 +30,9 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
     private final String secret, key, passphrase;
     private final InetAddress host;
     private CountDownLatch receivedLogon;
-    private FIXSession session;
+    private AtomicReference<FIXSession> session;
     private Thread thread;
-    private SocketChannel channel;
+    private AtomicReference<SocketChannel> channel;
 
     // By clientUuid
     private final HashMap<String, LDFIXOrder> knownOrders;
@@ -39,17 +40,41 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
     // By serverUuid
     private final HashMap<String, LDFIXOrder> unknownOrders;
 
+    public LDFIXSession(String host, int port, String secret, String key, String passphrase) throws UnknownHostException {
+        this.port = port;
+        this.key = key;
+        this.secret = secret;
+        this.passphrase = passphrase;
+        this.host = InetAddress.getByName(host);
+        this.knownOrders = new HashMap<>();
+        this.unknownOrders = new HashMap<>();
+        _initFields();
+    }
+
+    private void _initFields() {
+        this.channel = new AtomicReference<>(null);
+        this.session = new AtomicReference<>(null);
+        this.receivedLogon = new CountDownLatch(1);
+    }
+
+
     private void queryAllOrders() throws IOException {
         queryOrderByIdSelector("*");
     }
 
-    private void queryOrderByIdSelector(String selector) throws IOException {
-        FIXMessage m = session.create();
-        session.prepare(m, OrderStatusRequest);
+    private boolean queryOrderByIdSelector(String selector) throws IOException {
+        FIXSession s = session.get();
+        if (s == null)
+            return false;
+
+        FIXMessage m = s.create();
+        s.prepare(m, OrderStatusRequest);
         m.addField(OrderID).setString(selector);
         m.addField(Password).setString(passphrase);
         GDAX.sign(m, secret);
-        session.send(m);
+        s.send(m);
+
+        return true;
         // TODO: Set a flag here to expect execution report, and then parse it on receipt
         // TODO: Update your records with this execution report and keep a list of active knownOrders
     }
@@ -94,8 +119,12 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
 
     // 0.0001 BTC is the minimum
     private String submitLimitOrder(String uuid, String symbol, LDConstants.OrderSide side, double price, double qty, LDConstants.TimeInForce tif) throws IOException {
-        FIXMessage order = session.create();
-        session.prepare(order, OrderSingle);
+        FIXSession s = session.get();
+        if (s == null)
+            return null;
+
+        FIXMessage order = s.create();
+        s.prepare(order, OrderSingle);
         order.addField(HandlInst).setChar('1');
         order.addField(ClOrdID).setString(uuid);
         order.addField(Symbol).setString(symbol);
@@ -106,13 +135,17 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
         order.addField(TimeInForce).setChar(tif.getValue());
         order.addField(Password).setString(passphrase);
         GDAX.sign(order, secret);
-        session.send(order);
+        s.send(order);
         return uuid;
     }
 
-    private void submitOrderCancelRequest(String uuid, String symbol, String origUuid, String orderId) throws IOException {
-        FIXMessage order = session.create();
-        session.prepare(order, OrderCancelRequest);
+    private boolean submitOrderCancelRequest(String uuid, String symbol, String origUuid, String orderId) throws IOException {
+        FIXSession s = session.get();
+        if (s == null)
+            return false;
+
+        FIXMessage order = s.create();
+        s.prepare(order, OrderCancelRequest);
         order.addField(Password).setString(passphrase);
         if (uuid != null)
             order.addField(ClOrdID).setString(uuid);
@@ -122,7 +155,8 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
         if (orderId != null)
             order.addField(OrderID).setString(orderId);
         GDAX.sign(order, secret);
-        session.send(order);
+        s.send(order);
+        return true;
     }
 
     public LDFIXOrder getByClientOrderId(String clientUuid) {
@@ -138,22 +172,14 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
         return null;
     }
 
-    public LDFIXSession(String host, int port, String secret, String key, String passphrase) throws UnknownHostException {
-        this.host = InetAddress.getByName(host);
-        this.port = port;
-        this.secret = secret;
-        this.channel = null;
-        this.key = key;
-        this.receivedLogon = new CountDownLatch(1);
-        this.passphrase = passphrase;
-        this.knownOrders = new HashMap<String, LDFIXOrder>();
-        this.unknownOrders = new HashMap<String, LDFIXOrder>();
-    }
+
 
     public boolean connected() {
-        if (session == null || channel == null)
+        FIXSession s = session.get();
+        SocketChannel c = channel.get();
+        if (s == null || c == null)
             return false;
-        if (!channel.isConnected())
+        if (!c.isConnected())
             return false;
         if (receivedLogon.getCount() == 1)
             return false;
@@ -165,8 +191,10 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
     }
 
     public boolean connect() throws IOException {
-        channel = SocketChannel.open();
-        channel.connect(new InetSocketAddress(this.host, this.port));
+        SocketChannel ch = SocketChannel.open();
+        this.channel.set(ch);
+
+        ch.connect(new InetSocketAddress(this.host, this.port));
 
         FIXConfig.Builder builder = new FIXConfig.Builder()
                 .setVersion(FIXVersion.FIX_4_2)
@@ -174,11 +202,12 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
                 .setTargetCompID("Coinbase")
                 .setHeartBtInt(30);
 
-        session = new FIXSession(channel, builder.build(), this, this);
+        FIXSession s = new FIXSession(ch, builder.build(), this, this);
+        this.session.set(s);
 
         // Construct login message
-        FIXMessage message = session.create();
-        session.prepare(message, Logon);
+        FIXMessage message = s.create();
+        s.prepare(message, Logon);
         message.addField(EncryptMethod).setInt(FIX42Enumerations.EncryptMethodValues.None);
         message.addField(HeartBtInt).setInt(30);
         message.addField(Password).setString(passphrase);
@@ -189,7 +218,7 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
 
         // Sign and send the message
         GDAX.sign(message, secret);
-        session.send(message);
+        s.send(message);
         logger.info("Sent FIX logon message, blocking connect() for 10 seconds until login confirmed");
 
         boolean loggedIn = false;
@@ -204,7 +233,7 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
         // Main loop
         while (true) {
             try {
-                if (session.receive() < 0) {
+                if (session.get().receive() < 0) {
                     logger.info("FIX Session ended.");
                     break;
                 }
@@ -215,14 +244,28 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
             }
         }
         try {
-            session.close();
+            session.get().close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        while(!this.connected()) {
+            logger.error("Attempting to reconnect..");
+            try {
+                this._initFields();
+                this.connect();
+                logger.info("Successfully reconnected.");
+            }
+            catch (Exception e) {
+                logger.error("FIX reconnect failed!");
+                e.printStackTrace();
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
+            }
+        }
     }
-
-
-
 
 
     public void message(FIXMessage message) {
@@ -287,16 +330,18 @@ public class LDFIXSession extends LDFIXMessageEnumerator implements FIXStatusLis
             logger.error("Failed to respond with FIX logout to a logout message. " +
                     "This likely won't have any consequences as we are closing down anyway.");
         }
-        this.session = null;
-        this.receivedLogon = new CountDownLatch(1);
     }
 
     public void sendLogout() throws IOException {
-        FIXMessage m = session.create();
-        session.prepare(m, Logout);
+        FIXSession s = session.get();
+        if (s == null)
+            return;
+
+        FIXMessage m = s.create();
+        s.prepare(m, Logout);
         m.addField(Password).setString(passphrase);
         GDAX.sign(m, secret);
-        session.send(m);
+        s.send(m);
         logger.debug("Sent FIX logout message");
     }
 }
