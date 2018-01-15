@@ -4,9 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.originblue.abstractds.LDMovingAverage;
-import com.originblue.abstractds.LDRBTree;
-import com.originblue.abstractds.LDTreap;
+import com.originblue.abstractds.*;
+import com.originblue.gui.LDSingleGraph;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
@@ -16,6 +15,7 @@ import org.eclipse.jetty.websocket.api.annotations.WebSocket;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.jglue.fluentjson.JsonBuilderFactory;
 import org.joda.time.format.ISODateTimeFormat;
+import org.knowm.xchart.XYSeries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,10 +65,18 @@ public class LDOrderbook {
     private AtomicReference<BigDecimal> lastBestBid, lastBestAsk, lastTradeSize, lastTradePrice;
     private AtomicReference<String> lastTradeSide;
 
-    private static LDMovingAverage avgLatency = new LDMovingAverage(1024);
+    private static LDTimedMovingAverage avgLatency = new LDTimedMovingAverage(1000 * 2);
     public BigDecimal millisSinceLastMessage() {
         avgLatency.add(BigDecimal.valueOf(System.currentTimeMillis() - lastWsMessageMillis.get()));
         return avgLatency.getAverage();
+    }
+
+    private LDSingleGraph marketOrders = null;
+    public void setMarketOrderDisplayPanel() {
+        marketOrders = new LDSingleGraph("Market Orders", 5000);
+        marketOrders.createDataset("marketSellsUSD", XYSeries.XYSeriesRenderStyle.Line);
+        marketOrders.createDataset("marketBuysUSD", XYSeries.XYSeriesRenderStyle.Line);
+        marketOrders.display();
     }
 
     public BigInteger getLastSequenceNumber() {
@@ -378,15 +386,45 @@ public class LDOrderbook {
             BigDecimal f = BigDecimal.ZERO;
             BigDecimal s = BigDecimal.ZERO;
             JsonElement funds = parsed.get("funds");
-            if (funds != null)
+            if (funds != null) {
                 f = funds.getAsBigDecimal();
+                if (marketOrders != null) {
+                    marketOrders.acquireWriteLock();
+                    // Make it a wider line so that it can be seen more easily
+                    for (int i = 0; i < 10; i++) {
+                        marketOrders.pushData("marketBuysUSD", f);
+                        marketOrders.pushData("marketSellsUSD", BigDecimal.ZERO);
+                    }
+                    marketOrders.releaseWriteLock();
+                }
+            }
             JsonElement size = parsed.get("size");
-            if (size != null)
+            if (size != null) {
                 s = size.getAsBigDecimal();
+                if (marketOrders != null) {
+                    BigDecimal adjusted = s.multiply(getLastTradePrice());
+                    marketOrders.acquireWriteLock();
+                    // Make it a wider line so that it can be seen more easily
+                    for (int i = 0; i < 10; i++) {
+                        marketOrders.pushData("marketSellsUSD", adjusted);
+                        marketOrders.pushData("marketBuysUSD", BigDecimal.ZERO);
+                    }
+                    marketOrders.releaseWriteLock();
+                }
+            }
+
             // TODO: maybe we need to add market orders?
             logger.debug("Received {} MARKET ORDER {} (funds: {}, size: {})",
                     side.toUpperCase(), orderId, f.toString(), s.toString());
             return;
+        }
+        else {
+            if (marketOrders != null) {
+                marketOrders.acquireWriteLock();
+                marketOrders.pushData("marketBuysUSD", BigDecimal.ZERO);
+                marketOrders.pushData("marketSellsUSD", BigDecimal.ZERO);
+                marketOrders.releaseWriteLock();
+            }
         }
 
         BigDecimal size = parsed.get("size").getAsBigDecimal();

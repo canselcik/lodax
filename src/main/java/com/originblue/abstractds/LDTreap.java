@@ -10,9 +10,7 @@ package com.originblue.abstractds;
 // void makeEmpty( )      --> Remove all items
 // Comparable constantLookup() --> constant time lookup, bitches
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 
 public class LDTreap<AnyType extends Comparable<? super AnyType>> {
@@ -180,15 +178,22 @@ public class LDTreap<AnyType extends Comparable<? super AnyType>> {
         return root == nullNode;
     }
 
-    /**
-     * Print the tree contents in sorted order.
-     */
-    public void printTree() {
-        if (isEmpty())
-            System.out.println("Empty tree");
-        else
-            printTree(root);
+    public List<AnyType> getItems() {
+        List<AnyType> all = new ArrayList<>();
+        if (isEmpty() || root == null)
+            return all;
+        _getItems(all, root);
+        return all;
     }
+
+    private void _getItems(List<AnyType> acc, TreapNode<AnyType> t) {
+        if (t != t.left) {
+            _getItems(acc, t.left);
+            acc.add(t.element);
+            _getItems(acc, t.right);
+        }
+    }
+
 
     /**
      * Internal method to insert into a subtree.
@@ -271,18 +276,6 @@ public class LDTreap<AnyType extends Comparable<? super AnyType>> {
         return t;
     }
 
-    /**
-     * Internal method to print a subtree in sorted order.
-     *
-     * @param t the node that roots the tree.
-     */
-    private void printTree(TreapNode<AnyType> t) {
-        if (t != t.left) {
-            printTree(t.left);
-            System.out.println(t.element.toString());
-            printTree(t.right);
-        }
-    }
 
     /**
      * Rotate binary tree node with left child.

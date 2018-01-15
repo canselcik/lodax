@@ -1,6 +1,4 @@
-import com.originblue.abstractds.LDRBNode;
-import com.originblue.abstractds.LDRBTree;
-import com.originblue.abstractds.LDTreap;
+import com.originblue.abstractds.*;
 import com.originblue.tracking.LDAskOrder;
 import com.originblue.tracking.LDBidOrder;
 import com.originblue.tracking.LDSequencedMessage;
@@ -172,6 +170,25 @@ public class LDOrderTest {
 
         assertEquals(treap.findBest().getPrice(), one.getPrice());
         treap.remove(one);
+    }
+
+    @Test
+    public void testTimedMovingAverage() {
+        LDTreap<LDTimedMovingAverageEntry> t = new LDTreap<>();
+
+        LDTimedMovingAverageEntry e1 = new LDTimedMovingAverageEntry(BigDecimal.valueOf(3), 1);
+        LDTimedMovingAverageEntry e2 = new LDTimedMovingAverageEntry(BigDecimal.valueOf(2), 2);
+        LDTimedMovingAverageEntry e3 = new LDTimedMovingAverageEntry(BigDecimal.valueOf(1), 3);
+
+        t.insert(e2);
+        t.insert(e3);
+        t.insert(e1);
+
+        assertEquals(t.findWorst(), e1);
+        assertEquals(t.findBest(), e3);
+        List<LDTimedMovingAverageEntry> items = t.getItems();
+        assertEquals(items.get(0).timestamp, t.findBest().timestamp);
+        assertEquals(items.get(2).timestamp, t.findWorst().timestamp);
     }
 
     @Test

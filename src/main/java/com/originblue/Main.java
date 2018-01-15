@@ -52,6 +52,7 @@ public class Main {
         }
 
         orderbook = new LDOrderbook(LDConstants.TRADINGPAIR, "full", secret, key, passphrase);
+        orderbook.setMarketOrderDisplayPanel();
         orderbook.sync();
 
         if (secret != null && key != null && passphrase != null) {
