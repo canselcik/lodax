@@ -378,9 +378,12 @@ public class LDGUI {
             else
                 newColor = Color.BLACK;
         }
-        if (newColor != Color.BLACK)
-            lblBestBid.setForeground(newColor);
-        lblBestBid.setText("$" + formatter.format(decimal));
+        Color finalNewColor = newColor;
+        SwingUtilities.invokeLater(() -> {
+            if (finalNewColor != Color.BLACK)
+                lblBestBid.setForeground(finalNewColor);
+            lblBestBid.setText("$" + formatter.format(decimal));
+        });
     }
 
     public void setBestAsk(BigDecimal decimal) {
@@ -396,9 +399,12 @@ public class LDGUI {
             else
                 newColor = Color.BLACK;
         }
-        if (newColor != Color.BLACK)
-            lblBestAsk.setForeground(newColor);
-        lblBestAsk.setText("$" + formatter.format(decimal));
+        Color finalNewColor = newColor;
+        SwingUtilities.invokeLater(() -> {
+            if (finalNewColor != Color.BLACK)
+                lblBestAsk.setForeground(finalNewColor);
+            lblBestAsk.setText("$" + formatter.format(decimal));
+        });
     }
 
     public void setLastTradePrice(BigDecimal decimal) {
@@ -414,34 +420,47 @@ public class LDGUI {
             else
                 newColor = Color.BLACK;
         }
-        if (newColor != Color.BLACK)
-            lblLastTrade.setForeground(newColor);
-        lblLastTrade.setText("$" + formatter.format(decimal));
+        Color finalNewColor = newColor;
+        SwingUtilities.invokeLater(() -> {
+            if (finalNewColor != Color.BLACK)
+                lblLastTrade.setForeground(finalNewColor);
+            lblLastTrade.setText("$" + formatter.format(decimal));
+        });
     }
 
     public void setUsdBalance(BigDecimal full, BigDecimal held) {
-        this.lblUSDBalance.setText(full.setScale(4, RoundingMode.HALF_EVEN).toString());
-        this.lblUSDHold.setText(held.setScale(4, RoundingMode.HALF_EVEN).toString());
+        SwingUtilities.invokeLater(() -> {
+            this.lblUSDBalance.setText(full.setScale(4, RoundingMode.HALF_EVEN).toString());
+            this.lblUSDHold.setText(held.setScale(4, RoundingMode.HALF_EVEN).toString());
+        });
     }
 
     public void setBtcBalance(BigDecimal full, BigDecimal held) {
-        this.lblBTCBalance.setText(full.setScale(8, RoundingMode.HALF_EVEN).toString());
-        this.lblBTCHold.setText(held.setScale(4, RoundingMode.HALF_EVEN).toString());
+        SwingUtilities.invokeLater(() -> {
+            this.lblBTCBalance.setText(full.setScale(8, RoundingMode.HALF_EVEN).toString());
+            this.lblBTCHold.setText(held.setScale(4, RoundingMode.HALF_EVEN).toString());
+        });
     }
 
     private void clearPriceFields() {
-        this.lblBestAsk.setText("");
-        this.lblBestBid.setText("");
-        this.lblLastTrade.setText("");
+        SwingUtilities.invokeLater(() -> {
+            this.lblBestAsk.setText("");
+            this.lblBestBid.setText("");
+            this.lblLastTrade.setText("");
+        });
     }
 
     public void setWsStatus(BigDecimal ms) {
-        this.lblWs.setText(ms.compareTo(BigDecimal.ZERO) <= 0 ? "N/A" : (String.valueOf(ms) + " ms"));
+        SwingUtilities.invokeLater(() -> {
+            this.lblWs.setText(ms.compareTo(BigDecimal.ZERO) <= 0 ? "N/A" : (String.valueOf(ms) + " ms"));
+        });
     }
 
     public void setFixStatus(boolean connected) {
-        this.lblFix.setText(connected ? "OK" : "N/A");
-        this.btnLogout.setEnabled(connected);
+        SwingUtilities.invokeLater(() -> {
+            this.lblFix.setText(connected ? "OK" : "N/A");
+            this.btnLogout.setEnabled(connected);
+        });
     }
 
 

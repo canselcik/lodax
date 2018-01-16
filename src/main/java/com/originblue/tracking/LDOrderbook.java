@@ -6,6 +6,11 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.originblue.abstractds.*;
 import com.originblue.gui.LDSingleGraph;
+import com.originblue.server.LDWebsocket;
+import com.originblue.server.messages.LDMsgBase;
+import info.monitorenter.gui.chart.Chart2D;
+import info.monitorenter.gui.chart.ITrace2D;
+import info.monitorenter.gui.chart.traces.Trace2DLtd;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
@@ -19,6 +24,8 @@ import org.knowm.xchart.XYSeries;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.swing.*;
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,6 +35,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +53,7 @@ public class LDOrderbook {
 
     private CountDownLatch closeLatch, unsubscribedLatch;
     private final JsonParser parser;
+
     private AtomicBoolean live;
     private AtomicLong lastWsMessageMillis;
     private static Logger logger = LoggerFactory.getLogger(LDOrderbook.class);
@@ -57,26 +66,25 @@ public class LDOrderbook {
     // Orderbook
     private volatile LDTreap<LDAskOrder> asks;
     private volatile LDTreap<LDBidOrder> bids;
-
-    // Last Information
     private AtomicReference<BigInteger> lastSequence;
     private AtomicReference<String> lastTradeId;
     private AtomicLong lastMessageTime;
-    private AtomicReference<BigDecimal> lastBestBid, lastBestAsk, lastTradeSize, lastTradePrice;
+    private AtomicReference<BigDecimal> lastBestBid, lastBestAsk, lastTradeSize;
+
+    private AtomicReference<BigDecimal> lastTradePrice;
+
     private AtomicReference<String> lastTradeSide;
 
     private static LDTimedMovingAverage avgLatency = new LDTimedMovingAverage(1000 * 2);
+    private volatile LDWebsocket ws;
+
     public BigDecimal millisSinceLastMessage() {
         avgLatency.add(BigDecimal.valueOf(System.currentTimeMillis() - lastWsMessageMillis.get()));
         return avgLatency.getAverage();
     }
 
-    private LDSingleGraph marketOrders = null;
-    public void setMarketOrderDisplayPanel() {
-        marketOrders = new LDSingleGraph("Market Orders", 5000);
-        marketOrders.createDataset("marketSellsUSD", XYSeries.XYSeriesRenderStyle.Line);
-        marketOrders.createDataset("marketBuysUSD", XYSeries.XYSeriesRenderStyle.Line);
-        marketOrders.display();
+    public void enableWsBroadcast(LDWebsocket ws) {
+        this.ws = ws;
     }
 
     public BigInteger getLastSequenceNumber() {
@@ -238,8 +246,7 @@ public class LDOrderbook {
                     this.closeLatch.countDown();
                     this.unsubscribedLatch.countDown();
                     this.live.set(false);
-                }
-                else
+                } else
                     logger.info("Connection established at seqNum: {}", lastSequence);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -305,6 +312,11 @@ public class LDOrderbook {
     }
 
     private synchronized void applySequencedMessage(LDSequencedMessage msg, boolean fromReplay) {
+        if (msg == null || msg.type == null) {
+            logger.warn("Received a parsed and sequenced message that's null or with null type");
+            return;
+        }
+
         this.lastSequence.set(msg.message.get("sequence").getAsBigInteger());
         this.lastMessageTime.set(ISODateTimeFormat.dateTime().parseMillis(msg.message.get("time").getAsString()));
 
@@ -382,34 +394,23 @@ public class LDOrderbook {
         String side = parsed.get("side").getAsString();
         String orderId = parsed.get("order_id").getAsString();
         String orderType = parsed.get("order_type").getAsString();
+        double now = System.currentTimeMillis();
         if (orderType.equals("market")) {
             BigDecimal f = BigDecimal.ZERO;
             BigDecimal s = BigDecimal.ZERO;
             JsonElement funds = parsed.get("funds");
             if (funds != null) {
                 f = funds.getAsBigDecimal();
-                if (marketOrders != null) {
-                    marketOrders.acquireWriteLock();
-                    // Make it a wider line so that it can be seen more easily
-                    for (int i = 0; i < 10; i++) {
-                        marketOrders.pushData("marketBuysUSD", f);
-                        marketOrders.pushData("marketSellsUSD", BigDecimal.ZERO);
-                    }
-                    marketOrders.releaseWriteLock();
-                }
+                if (ws != null)
+                    ws.broadcast(LDMsgBase.generateMarketOrderRecv('b', f));
             }
             JsonElement size = parsed.get("size");
             if (size != null) {
                 s = size.getAsBigDecimal();
-                if (marketOrders != null) {
-                    BigDecimal adjusted = s.multiply(getLastTradePrice());
-                    marketOrders.acquireWriteLock();
-                    // Make it a wider line so that it can be seen more easily
-                    for (int i = 0; i < 10; i++) {
-                        marketOrders.pushData("marketSellsUSD", adjusted);
-                        marketOrders.pushData("marketBuysUSD", BigDecimal.ZERO);
-                    }
-                    marketOrders.releaseWriteLock();
+                BigDecimal lastTradePrice = getLastTradePrice();
+                if (ws != null && lastTradePrice != null) {
+                    BigDecimal adjusted = s.multiply(lastTradePrice);
+                    ws.broadcast(LDMsgBase.generateMarketOrderRecv('s', adjusted));
                 }
             }
 
@@ -418,14 +419,7 @@ public class LDOrderbook {
                     side.toUpperCase(), orderId, f.toString(), s.toString());
             return;
         }
-        else {
-            if (marketOrders != null) {
-                marketOrders.acquireWriteLock();
-                marketOrders.pushData("marketBuysUSD", BigDecimal.ZERO);
-                marketOrders.pushData("marketSellsUSD", BigDecimal.ZERO);
-                marketOrders.releaseWriteLock();
-            }
-        }
+
 
         BigDecimal size = parsed.get("size").getAsBigDecimal();
         BigDecimal price = parsed.get("price").getAsBigDecimal();
@@ -630,10 +624,6 @@ public class LDOrderbook {
         String reason = parsed.get("reason").getAsString();
         String side = parsed.get("side").getAsString();
 
-        BigDecimal remainingSize = BigDecimal.ZERO;
-        if (!reason.equals("filled"))
-            remainingSize = parsed.get("remaining_size").getAsBigDecimal();
-
         // Market order, was never on the books
         JsonElement priceElement = parsed.get("price");
         JsonElement fundsElement = parsed.get("funds");
@@ -646,6 +636,12 @@ public class LDOrderbook {
             funds = fundsElement.getAsBigDecimal();
         }
 
+        BigDecimal remainingSize = BigDecimal.ZERO;
+        if (!reason.equals("filled")) {
+            remainingSize = parsed.get("remaining_size").getAsBigDecimal();
+        }
+
+//        BigDecimal lastTradePrice = getLastTradePrice();
         if (side.equals("sell")) {
             // Maker was an ask, we will alter asks. Uptick
             LDAskOrder node = this.asks.constantLookup(orderId);
@@ -653,6 +649,17 @@ public class LDOrderbook {
                 logger.debug("Received SELL DONE for an unknown order_id {} (remaining_size: {}, funds: {}, price: {})",
                         orderId, remainingSize, funds, price);
             } else {
+//                if (!reason.equals("filled") && this.cancelledOrders != null && lastTradePrice != null) {
+//                    SwingUtilities.invokeLater(() -> {
+//                        cancelledOrders.acquireWriteLock();
+//                        cancelledOrders.pushData("cancelledBids", BigDecimal.ZERO);
+//                        cancelledOrders.pushData("cancelledAsks", node.getPrice()
+//                                .subtract(lastTradePrice)
+//                                .abs()
+//                                .multiply(node.getSize()));
+//                        cancelledOrders.releaseWriteLock();
+//                    });
+//                }
                 // remainingSize of the order went unfulfilled
                 this.asks.remove(node);
             }
@@ -663,6 +670,18 @@ public class LDOrderbook {
                 logger.debug("Received BUY DONE for an unknown order_id {} (remaining_size: {}, funds: {}, price: {})",
                         orderId, remainingSize, funds, price);
             } else {
+//                if (!reason.equals("filled") && this.ws != null && lastTradePrice != null) {
+//                    SwingUtilities.invokeLater(() -> {
+//                        cancelledOrders.acquireWriteLock();
+//                        cancelledOrders.pushData("cancelledAsks", BigDecimal.ZERO);
+//                        cancelledOrders.pushData("cancelledBids", node.getPrice()
+//                                .subtract(lastTradePrice)
+//                                .abs()
+//                                .multiply(node.getSize())
+//                                .negate());
+//                        cancelledOrders.releaseWriteLock();
+//                    });
+//                }
                 // remainingSize of the order went unfulfilled
                 this.bids.remove(node);
             }

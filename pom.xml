@@ -47,7 +47,7 @@
         <dependency>
             <groupId>org.eclipse.jetty.websocket</groupId>
             <artifactId>websocket-client</artifactId>
-            <version>9.1.2.v20140210</version>
+            <version>9.4.8.v20171121</version>
         </dependency>
         <dependency>
             <groupId>com.paritytrading.philadelphia</groupId>
@@ -66,6 +66,16 @@
             <version>1.6.3</version>
         </dependency>
         <dependency>
+            <groupId>javax.websocket</groupId>
+            <artifactId>javax.websocket-api</artifactId>
+            <version>1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.webbitserver</groupId>
+            <artifactId>webbit</artifactId>
+            <version>0.4.15</version>
+        </dependency>
+        <dependency>
             <groupId>org.jglue.fluent-json</groupId>
             <artifactId>fluent-json</artifactId>
             <version>1.0.0</version>
@@ -74,6 +84,11 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-math3</artifactId>
             <version>3.6.1</version>
+        </dependency>
+        <dependency>
+            <groupId>net.sf.jchart2d</groupId>
+            <artifactId>jchart2d</artifactId>
+            <version>3.3.2</version>
         </dependency>
     </dependencies>
 
