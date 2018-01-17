@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 public class LDConstants {
     public final static BigDecimal MIN_PRICEDIFF = BigDecimal.valueOf(0.01);
-    public static final String PRIMARY_CRYPTO = "ETH";
+    public static final String PRIMARY_CRYPTO = "BTC";
     public static final String PRIMARY_FIAT = "USD";
     public static String TRADINGPAIR = PRIMARY_CRYPTO + "-" + PRIMARY_FIAT;
 

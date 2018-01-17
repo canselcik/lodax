@@ -4,8 +4,8 @@
 <title>GDAX Realtime Market Watcher</title>
 <script src="https://cdn.bootcss.com/Chart.js/2.7.1/Chart.bundle.js"></script>
 <script type="text/javascript">
-      //var wsUri = "ws://" + window.location.host + "/api/v0/websocket";
-      var wsUri = "ws://localhost:9025/api/v0/websocket";
+      var wsUri = "ws://" + window.location.host + "/api/v0/websocket";
+      // var wsUri = "ws://localhost:9025/api/v0/websocket";
       var decoder = new TextDecoder("UTF-8");
       var output;
       var marketSells = [];
@@ -205,7 +205,7 @@
                }
           }
 
-         var now = new Date();
+         var now = new Date(parsed['timestamp']);
          if (type == "t") {
            var ltp = msg['price'];
            var bb = msg["bestBid"];
@@ -246,13 +246,13 @@
              if (side == "s") {
                  var sellUsd = msg['amount'];
                  if (sellUsd != null) {
-                   marketSells.push({x: new Date(), y: sellUsd});
+                   marketSells.push({x: now, y: sellUsd});
                  }
              }
              else if (side == "b") {
                 var buyUsd = msg['amount'];
                 if (buyUsd != null) {
-                  marketBuys.push({x: new Date(), y: buyUsd});
+                  marketBuys.push({x: now, y: buyUsd});
                 }
              }
          }
