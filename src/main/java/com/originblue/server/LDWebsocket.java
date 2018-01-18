@@ -34,8 +34,7 @@ public class LDWebsocket extends BaseWebSocketHandler {
             byte[] b = s.getBytes("UTF-8");
             conn.send(b);
             return true;
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
             return false;
         }
     }

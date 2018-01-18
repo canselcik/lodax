@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+	<title>FrontRunner Network Live Preview</title>
+
+	<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' />
+    <meta name="viewport" content="width=device-width" />
+
+    <link href="assets/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="assets/css/light-bootstrap-dashboard.css?v=1.4.0" rel="stylesheet"/>
+    <link href="assets/css/demo.css" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/google/code-prettify/master/loader/prettify.css">
+    <link href="assets/css/documentation.css" rel="stylesheet" />
+
+    <!--     Fonts and icons     -->
+    <link href="http://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css" rel="stylesheet">
+    <link href='https://fonts.googleapis.com/css?family=Grand+Hotel|Open+Sans:400,300' rel='stylesheet' type='text/css'>
+    <link href="assets/css/pe-icon-7-stroke.css" rel="stylesheet" />
+</head>
+
+<body>
+
+
+
+<div class="header-wrapper">
+        <nav class="navbar navbar-transparent navbar-fixed-top" role="navigation" color-on-scroll>
+          <div class="container">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+              <button id="menu-toggle" type="button" class="navbar-toggle">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar bar1"></span>
+                <span class="icon-bar bar2"></span>
+                <span class="icon-bar bar3"></span>
+              </button>
+              <a href="http://www.frontrunner.network">
+                   <div class="logo-container">
+                        <div class="brand">
+                            FrontRunner Network
+                        </div>
+                    </div>
+              </a>
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse">
+              <ul  class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href='mailto:contact@frontrunner.network' class="btn btn-simple btn-neutral">Contact</a>
+                    </li>
+               </ul>
+
+            </div><!-- /.navbar-collapse -->
+          </div><!-- /.container-fluid -->
+        </nav>
+
+        <div class="header" style="background-image: url('assets/img/full-screen-image-3.jpg');">
+            <div class="filter"></div>
+            <div class="title-container text-center">
+					<h1>Realtime Insights Live Preview</h1>
+					<h3 class="category">Unbuffered, low-latency, market data and indicator API</h3>
+					<div style="padding-left: 120px; padding-right: 120px; padding-top: 30px;">
+						<canvas id="chart" style="background-color: rgba(255, 255, 255, 0.6); height: 80%;"></canvas>
+						<p style="padding-top: 10px;">
+							<a href="#" id="decHist" class="btn btn-neutral btn-lg btn-round btn-fill">-</a>
+							<a href="#" id="incHist" class="btn btn-neutral btn-lg btn-round btn-fill">+</a>
+                    		<a href="#" class="btn btn-neutral btn-lg btn-round btn-fill" disabled>View Documentation</a>
+						</p>
+						<div id="output" style="color: gray; display: none;"></div>
+					</div>
+            </div>
+        </div>
+</div>
+</body>
+</html>
