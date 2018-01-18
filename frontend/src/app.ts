@@ -248,7 +248,6 @@ class Poller {
       if (optElem != null)
         Poller.output = optElem;
 
-      Poller.marketSells = new Array<IPoint>();
       Poller.websocket = new WebSocket(Poller.wsUri);
       Poller.websocket.binaryType = 'arraybuffer';
       Poller.websocket.onopen = function(evt: any) {
