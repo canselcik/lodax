@@ -1,42 +1,160 @@
 
-import ReconnectingWebSocket from './reconnecting-websocket';
 import Chart = require('./Chart.bundle');
+import * as BoundedBuffer from "./BoundedBuffer";
+import * as Conn from "./Conn"
 
-interface IPoint {
-  x: Date;
-  y: number;
-}
+class PrimaryChart {
+  public output: HTMLElement;
+  public static decoder: any = new (<any>window).TextDecoder("UTF-8");
+  public chartCtx: any;
+  public chartElement: HTMLCanvasElement;
+  public marketSells: BoundedBuffer.BoundedBuffer;
+  public marketBuys: BoundedBuffer.BoundedBuffer;
+  public bestAsks: BoundedBuffer.BoundedBuffer;
+  public bestBids: BoundedBuffer.BoundedBuffer;
+  public lastTradePrices: BoundedBuffer.BoundedBuffer;
+  public scatterChart: any;
 
-class Poller {
-  public static output: HTMLElement;
-  public static decoder: any;
-  public static marketSells: any = [];
-  public static marketBuys: any = [];
-  public static chartCtx: any;
-  public static chartElement: HTMLCanvasElement;
-  public static bestAsks: any = [];
-  public static bestBids: any = [];
-  public static lastTradePrices: any = [];
-  public static scatterChart: any;
-  public static websocket: any;
+  constructor(canvas: HTMLCanvasElement) {
+    this.marketBuys = new BoundedBuffer.BoundedBuffer(1200);
+    this.marketSells = new BoundedBuffer.BoundedBuffer(1200);
+    this.bestAsks = new BoundedBuffer.BoundedBuffer(1200);
+    this.bestBids = new BoundedBuffer.BoundedBuffer(1200);
+    this.lastTradePrices = new BoundedBuffer.BoundedBuffer(1200);
 
-  private static wsUri = "ws://" + window.location.host + "/api/v0/websocket";
-  // private static wsUri = "ws://localhost:9025/api/v0/websocket";
+    this.chartElement = canvas;
+    this.chartCtx = canvas.getContext("2d");
 
-  private static histSize: number = 1250;
-  public static adjustHistorySize(factor: number) {
-    Poller.histSize = Poller.histSize * factor;
+    var parent = this;
+    this.scatterChart = new Chart(this.chartCtx, {
+      type: 'bubble',
+      data: {
+          datasets: [
+            {
+              label: 'Market Sell [USD]',
+              data: this.marketSells.getArray(),
+              yAxisID: "MarketOrders",
+              radius: 30,
+              backgroundColor: "rgba(196, 93, 105, 0.3)"
+            },
+            {
+              label: 'Market Buy [USD]',
+              data: this.marketBuys.getArray(),
+              yAxisID: "MarketOrders",
+              radius: 30,
+              backgroundColor: "rgba(32, 162, 219, 0.3)"
+            },
+            {
+              type: 'line',
+              fill: 'start',
+              steppedLine: 'after',
+              backgroundColor: "rgba(70, 80, 191, 0.3)",
+              label: 'Best Bid',
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              yAxisID: "TradePrice",
+              data: this.bestBids.getArray(),
+            },
+            {
+              type: 'line',
+              fill: 'end',
+              steppedLine: 'after',
+              backgroundColor: "rgba(237, 179, 99, 0.3)",
+              label: 'Best Ask',
+              yAxisID: "TradePrice",
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              data: this.bestAsks.getArray(),
+            },
+            {
+              type: 'line',
+              fill: false,
+              backgroundColor: "rgb(110, 53, 224)",
+              borderColor: "rgb(110, 53, 224)",
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              borderDash: [5, 5],
+              label: 'Last Trade Price',
+              yAxisID: "TradePrice",
+              data: this.lastTradePrices.getArray(),
+            }
+          ]
+      },
+      options: {
+        events: ['click'],
+        animation: {
+          duration: 1,
+          onComplete: function () {
+              var chartInstance = parent.scatterChart;
+              var ctx = chartInstance.ctx;
+              ctx.font = Chart.helpers.fontString(Chart.defaults.global.defaultFontSize, Chart.defaults.global.defaultFontStyle, Chart.defaults.global.defaultFontFamily);
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+
+              var mss = chartInstance.controller.getDatasetMeta(0);
+              var mbs = chartInstance.controller.getDatasetMeta(1);
+              mbs.data.forEach(function (bar: any, index: any) {
+                var data = parent.marketBuys.getAt(index);
+                if (data == null)
+                  return;
+                ctx.fillStyle = "#000000";
+                ctx.font = "bold 12px verdana, sans-serif";
+                ctx.fillText(Math.round(data), bar._model.x + 1, bar._model.y);
+              });
+              mss.data.forEach(function (bar: any, index: any) {
+                var data = parent.marketSells.getAt(index);
+                if (data == null)
+                  return;
+                ctx.fillStyle = "#000000";
+                ctx.font = "bold 12px verdana, sans-serif";
+                ctx.fillText(Math.round(data), bar._model.x + 1, bar._model.y);
+              });
+            }
+          },
+          tooltips: {
+            enabled: false
+          },
+          scales: {
+            xAxes: [{ gridLines: { 
+                        display: false
+                      },
+                      ticks: {
+                        autoSkip: false,
+                        maxRotation: 0,
+                        minRotation: 0,
+                        steps: 5,
+                        stepValue: 2
+                      },
+                      type: 'time',
+                      distribution: 'series',
+                      position: 'bottom',
+                      barThickness: 20
+                    }],
+            yAxes: [{ gridLines: {
+                        display: false
+                      },
+                      type: "linear",
+                      display: true,
+                      position: "left",
+                      id: "MarketOrders",
+                    },
+                    {
+                      gridLines: {
+                        display: false
+                      },
+                      type: "linear",
+                      display: true,
+                      position: "right",
+                      id: "TradePrice",
+                  }]
+        }
+      }
+    });
+    this.updateChart();
   }
 
-  private static writeToScreen(message: string) {
-    var pre = document.createElement("p");
-    pre.style.wordWrap = "break-word";
-    pre.innerHTML = message;
-    Poller.output.appendChild(pre);
-  }
-
-  private static onMessage(evt: any) {
-    var decoded = Poller.decoder.decode(evt.data);
+  public onMessage(evt: any) {
+    var decoded = PrimaryChart.decoder.decode(evt.data);
     var parsed = JSON.parse(decoded);
     var msg = parsed['message'];
     if (msg == null)
@@ -46,25 +164,13 @@ class Poller {
     if (type == null)
       return;
  
-    while (Poller.lastTradePrices.length >= Poller.histSize) {
-      Poller.lastTradePrices.shift();
+    var ltDate = this.lastTradePrices.getDateAt(0);
+    if (ltDate != null) {
+      this.marketSells.shiftUntilGeq(ltDate);
+      this.marketBuys.shiftUntilGeq(ltDate);
+      this.bestAsks.shiftUntilGeq(ltDate);
+      this.bestBids.shiftUntilGeq(ltDate);
     }
- 
-    if (Poller.lastTradePrices.length > 0) {
-      var headDate = Poller.lastTradePrices[0]['x'].getTime();
-      while (Poller.marketSells.length > 0 && headDate - Poller.marketSells[0]['x'].getTime() > 0) {
-        Poller.marketSells.shift();
-      }
-      while (Poller.marketBuys.length > 0 && headDate - Poller.marketBuys[0]['x'].getTime() > 0) {
-        Poller.marketBuys.shift();
-      }
-      while (Poller.bestAsks.length > 0 && headDate - Poller.bestAsks[0]['x'].getTime() > 0) {
-        Poller.bestAsks.shift();
-      }
-      while (Poller.bestBids.length > 0 && headDate - Poller.bestBids[0]['x'].getTime() > 0) {
-        Poller.bestBids.shift();
-      }
-     }
  
     var now = new Date(parsed['timestamp']);
     if (type == "t") {
@@ -77,201 +183,39 @@ class Poller {
           console.log("ignored");
           return;
         }
-        Poller.lastTradePrices.push({x: now, y: ltp});
-        Poller.bestAsks.push({x: now, y: ba});
-        Poller.bestBids.push({x: now, y: bb});
+        this.lastTradePrices.push(now, ltp);
+        this.bestAsks.push(now, ba);
+        this.bestBids.push(now, bb);
       }
     }
-    else if (type == "m" && Poller.lastTradePrices.length > 0) {
+    else if (type == "m" && this.lastTradePrices.getLength() > 0) {
         var side = msg['side'];
         if (side == null)
           return;
         if (side == "s") {
             var sellUsd = msg['amount'];
             if (sellUsd != null) {
-              Poller.marketSells.push({x: now, y: sellUsd});
+              this.marketSells.push(now, sellUsd);
             }
         }
         else if (side == "b") {
            var buyUsd = msg['amount'];
            if (buyUsd != null) {
-            Poller.marketBuys.push({x: now, y: buyUsd});
+            this.marketBuys.push(now, buyUsd);
            }
         }
     }
- }
-
-
-  public static main(): number {
-    var incHist = document.getElementById('incHist');
-    var decHist = document.getElementById('decHist');
-    if (incHist != null) {
-      incHist.onclick = function() {
-        Poller.adjustHistorySize(2);   
-      };
-    };
-    if (decHist != null) {
-      decHist.onclick = function() {
-        Poller.adjustHistorySize(1/2);   
-      };
-    };
-    Poller.chartElement = <HTMLCanvasElement>document.getElementById("chart");
-    Poller.chartCtx = Poller.chartElement.getContext('2d');
-    Poller.scatterChart = new Chart(Poller.chartCtx, {
-        type: 'bubble',
-        data: {
-            datasets: [
-              {
-                label: 'Market Sell [USD]',
-                data: Poller.marketSells,
-                yAxisID: "MarketOrders",
-                radius: 30,
-                backgroundColor: "rgba(196, 93, 105, 0.3)"
-              },
-              {
-                label: 'Market Buy [USD]',
-                data: Poller.marketBuys,
-                yAxisID: "MarketOrders",
-                radius: 30,
-                backgroundColor: "rgba(32, 162, 219, 0.3)"
-              },
-              {
-                type: 'line',
-                fill: 'start',
-                steppedLine: 'after',
-                backgroundColor: "rgba(70, 80, 191, 0.3)",
-                label: 'Best Bid',
-                pointRadius: 0,
-                pointHoverRadius: 0,
-                yAxisID: "TradePrice",
-                data: Poller.bestBids,
-              },
-              {
-                type: 'line',
-                fill: 'end',
-                steppedLine: 'after',
-                backgroundColor: "rgba(237, 179, 99, 0.3)",
-                label: 'Best Ask',
-                yAxisID: "TradePrice",
-                pointRadius: 0,
-                pointHoverRadius: 0,
-                data: Poller.bestAsks,
-              },
-              {
-                type: 'line',
-                fill: false,
-                backgroundColor: "rgb(110, 53, 224)",
-                borderColor: "rgb(110, 53, 224)",
-                pointRadius: 0,
-                pointHoverRadius: 0,
-                borderDash: [5, 5],
-                label: 'Last Trade Price',
-                yAxisID: "TradePrice",
-                data: Poller.lastTradePrices,
-              }
-            ]
-        },
-        options: {
-          events: ['click'],
-          animation: {
-            duration: 1,
-            onComplete: function () {
-                var chartInstance = Poller.scatterChart;
-                var ctx = chartInstance.ctx;
-                ctx.font = Chart.helpers.fontString(Chart.defaults.global.defaultFontSize, Chart.defaults.global.defaultFontStyle, Chart.defaults.global.defaultFontFamily);
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-  
-                var mss = chartInstance.controller.getDatasetMeta(0);
-                var mbs = chartInstance.controller.getDatasetMeta(1);
-                mbs.data.forEach(function (bar: any, index: any) {
-                  if (index >= Poller.marketBuys.length)
-                    return;
-                  var data = Poller.marketBuys[index]['y'];
-                  ctx.fillStyle = "#000000";
-                  ctx.font = "bold 12px verdana, sans-serif";
-                  ctx.fillText(Math.round(data), bar._model.x + 1, bar._model.y);
-                });
-                mss.data.forEach(function (bar: any, index: any) {
-                  if (index >= Poller.marketSells.length)
-                    return;
-                  var data = Poller.marketSells[index]['y'];
-                  ctx.fillStyle = "#000000";
-                  ctx.font = "bold 12px verdana, sans-serif";
-                  ctx.fillText(Math.round(data), bar._model.x + 1, bar._model.y);
-                });
-              }
-            },
-            tooltips: {
-              enabled: false
-            },
-            scales: {
-              xAxes: [{ gridLines: { 
-                          display: false
-                        },
-                        ticks: {
-                          autoSkip: false,
-                          maxRotation: 0,
-                          minRotation: 0,
-                          steps: 5,
-                          stepValue: 2
-                        },
-                        type: 'time',
-                        distribution: 'series',
-                        position: 'bottom',
-                        barThickness: 20
-                      }],
-              yAxes: [{ gridLines: {
-                          display: false
-                        },
-                        type: "linear",
-                        display: true,
-                        position: "left",
-                        id: "MarketOrders",
-                      },
-                      {
-                        gridLines: {
-                          display: false
-                        },
-                        type: "linear",
-                        display: true,
-                        position: "right",
-                        id: "TradePrice",
-                    }]
-          }
-        }
-      });
-
-      Poller.decoder = new (<any>window).TextDecoder("UTF-8");
-      
-      var optElem = document.getElementById("output");
-      if (optElem != null)
-        Poller.output = optElem;
-
-      Poller.websocket = new WebSocket(Poller.wsUri);
-      Poller.websocket.binaryType = 'arraybuffer';
-      Poller.websocket.onopen = function(evt: any) {
-        Poller.writeToScreen("Connection established");
-      };
-      Poller.websocket.onclose = function(evt: any) {
-        Poller.writeToScreen("Not connected");
-      };
-      Poller.websocket.onmessage = function(evt: any) {
-        Poller.onMessage(evt);
-      };
-      Poller.websocket.onerror = function(evt: any) {
-        Poller.writeToScreen('<span style = "color: red;">ERROR:</span> ' + evt.data);
-      };
-
-      Poller.updateChart();
-      return 0;
   }
 
-  private static updateChart() {
-    Poller.scatterChart.update(0);
-    setTimeout(Poller.updateChart, 40);
+  private updateChart() {
+    this.scatterChart.update();
+    setTimeout(() => { this.updateChart() }, 40);
   }
 }
+
 window.onload = function () {
-  Poller.main();
+  var chart = new PrimaryChart(<HTMLCanvasElement>document.getElementById("chart"));
+  var poller = new Conn.Conn(function(evt: any) {
+    chart.onMessage(evt);
+  });
 }
