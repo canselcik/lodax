@@ -2,6 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const OptimizeJsPlugin = require("optimize-js-plugin");
 
 module.exports = {
   entry:
@@ -35,7 +36,11 @@ module.exports = {
         to: path.resolve(__dirname, "dist/assets")
       }
     ]),
-    new webpack.NoEmitOnErrorsPlugin()
+    new webpack.NoEmitOnErrorsPlugin(),
+    new webpack.optimize.UglifyJsPlugin(),
+    new OptimizeJsPlugin({
+        sourceMap: false
+    })
   ],
   output: {
     filename: 'webpack',
