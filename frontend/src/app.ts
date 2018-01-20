@@ -135,6 +135,10 @@ class PrimaryChart {
                       },
                       type: "linear",
                       display: true,
+                      ticks: {
+                        min: 0,
+                        suggestedMax: 100000
+                      },
                       position: "left",
                       id: "MarketOrders",
                     },
@@ -144,6 +148,10 @@ class PrimaryChart {
                       },
                       type: "linear",
                       display: true,
+                      ticks: {
+                        min: 0,
+                        suggestedMax: 100000
+                      },
                       position: "right",
                       id: "TradePrice",
                   }]
