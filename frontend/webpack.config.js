@@ -4,25 +4,29 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const OptimizeJsPlugin = require("optimize-js-plugin");
 
+
 module.exports = {
-  entry:
-   { 
+  entry: {
     "app": [
-      path.resolve(__dirname, 'src/Chart.bundle.js'),
-      path.resolve(__dirname, 'src/app.ts')
+      path.resolve(__dirname, 'src/app.ts'),
     ]
   },
   module: {
     loaders: [
       {
-        test: /\.(t|j)s$/,
+        test: /\.(t|j)sx?$/,
         loader: 'ts-loader',
+        exclude: /node_modules/
+      },
+      {
+        test : /\.jsx/,
+        loader : 'babel-loader',
         exclude: /node_modules/
       }
     ]
   },
   resolve: {
-    extensions: [ ".tsx", ".ts", ".js", ".css" ]
+    extensions: [ ".tsx", ".ts", ".js", ".css", ".jsx" ]
   },
   plugins: [
     new webpack.optimize.CommonsChunkPlugin('app'),
