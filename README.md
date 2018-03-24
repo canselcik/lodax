@@ -1,5 +1,7 @@
 # LoDax - Low Latency High Throughput Pipeline to GDAX
 
+See here for a better demo: https://gfycat.com/gifs/detail/JitteryReasonableAdeliepenguin
+
 ![Buy or sell, do whatever](https://i.imgur.com/lyCCvpA.png)
 
 ![Watch with no latency](https://i.imgur.com/qiHB4A8.png)
